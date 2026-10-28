@@ -10,6 +10,7 @@ FROM eclipse-temurin:25-jre-noble
 
 WORKDIR /app
 RUN useradd --system --uid 10001 --create-home app
+RUN mkdir -p /data/uploads && chown 10001:10001 /data/uploads
 COPY --from=build --chown=10001:10001 /workspace/app.jar /app/app.jar
 USER 10001:10001
 
