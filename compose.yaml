@@ -18,6 +18,9 @@ services:
 
   api:
     image: ghcr.io/oscarquell/aar-smm-backend:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-azem_portfolio}
