@@ -9,6 +9,7 @@ public record PortfolioItem(
         String title,
         String category,
         String description,
+        String externalUrl,
         List<String> serviceTags,
         boolean featuredOnHome,
         boolean published,

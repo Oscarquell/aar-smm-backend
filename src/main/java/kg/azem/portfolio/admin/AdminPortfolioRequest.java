@@ -14,6 +14,7 @@ public record AdminPortfolioRequest(
         @NotBlank @Size(max = 180) String category,
         @NotBlank @Size(max = 5000) String description,
         @NotEmpty @Size(max = 12) List<@NotBlank @Size(max = 60) String> serviceTags,
+        @Size(max = 2048) @Pattern(regexp = "https?://\\S+") String externalUrl,
         boolean featuredOnHome,
         boolean published,
         @Min(0) int sortOrder

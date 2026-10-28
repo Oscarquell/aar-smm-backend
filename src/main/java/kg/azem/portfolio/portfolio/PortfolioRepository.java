@@ -55,9 +55,9 @@ public class PortfolioRepository {
         return jdbcTemplate.execute((ConnectionCallback<Long>) connection -> {
             try (PreparedStatement statement = connection.prepareStatement("""
                     insert into portfolio_items (
-                        slug, type, title, category, description, service_tags,
+                        slug, type, title, category, description, service_tags, external_url,
                         featured_on_home, published, sort_order
-                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?) returning id
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) returning id
                     """)) {
                 setItemParameters(statement, connection, request, false, 0);
                 try (ResultSet result = statement.executeQuery()) {
@@ -72,7 +72,7 @@ public class PortfolioRepository {
         Integer count = jdbcTemplate.execute((ConnectionCallback<Integer>) connection -> {
             try (PreparedStatement statement = connection.prepareStatement("""
                     update portfolio_items set
-                        slug = ?, type = ?, title = ?, category = ?, description = ?, service_tags = ?,
+                        slug = ?, type = ?, title = ?, category = ?, description = ?, service_tags = ?, external_url = ?,
                         featured_on_home = ?, published = ?, sort_order = ?, updated_at = now()
                     where id = ?
                     """)) {
@@ -96,10 +96,11 @@ public class PortfolioRepository {
         statement.setString(4, request.category().trim());
         statement.setString(5, request.description().trim());
         statement.setArray(6, connection.createArrayOf("text", request.serviceTags().toArray(String[]::new)));
-        statement.setBoolean(7, request.featuredOnHome());
-        statement.setBoolean(8, request.published());
-        statement.setInt(9, request.sortOrder());
-        if (update) statement.setLong(10, id);
+        statement.setString(7, request.externalUrl());
+        statement.setBoolean(8, request.featuredOnHome());
+        statement.setBoolean(9, request.published());
+        statement.setInt(10, request.sortOrder());
+        if (update) statement.setLong(11, id);
     }
 
     public List<String> deleteItem(long id) {
@@ -155,7 +156,7 @@ public class PortfolioRepository {
     private List<PortfolioItem> findItems(String filter, Object... arguments) {
         String sql = """
                 select id, slug, type, title, category, description, service_tags,
-                       featured_on_home, published, sort_order
+                       external_url, featured_on_home, published, sort_order
                 from portfolio_items
                 """ + filter;
 
@@ -170,6 +171,7 @@ public class PortfolioRepository {
                 rs.getString("title"),
                 rs.getString("category"),
                 rs.getString("description"),
+                rs.getString("external_url"),
                 readTags(rs),
                 rs.getBoolean("featured_on_home"),
                 rs.getBoolean("published"),
