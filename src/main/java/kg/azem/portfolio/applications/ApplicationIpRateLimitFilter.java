@@ -24,7 +24,12 @@ public class ApplicationIpRateLimitFilter extends OncePerRequestFilter {
     private static final long CLEANUP_EVERY = 256;
 
     private final Map<String, Deque<Long>> requestsByIp = new HashMap<>();
+    private final BlockedIpService blockedIpService;
     private long acceptedRequests;
+
+    public ApplicationIpRateLimitFilter(BlockedIpService blockedIpService) {
+        this.blockedIpService = blockedIpService;
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -39,18 +44,48 @@ public class ApplicationIpRateLimitFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String clientIp = request.getRemoteAddr();
-        RateLimitDecision decision = registerRequest(clientIp == null ? "unknown" : clientIp);
-
-        if (!decision.allowed()) {
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setHeader("Retry-After", Long.toString(decision.retryAfterSeconds()));
+        if (clientIp == null || clientIp.isBlank()) {
+            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
-            response.getWriter().write("{\"message\":\"С этого IP уже отправлено 3 заявки за последний час. Попробуйте позже.\"}");
+            response.getWriter().write("{\"message\":\"Не удалось определить адрес клиента. Попробуйте позже.\"}");
+            return;
+        }
+
+        if (blockedIpService.isBlocked(clientIp)) {
+            writeRateLimitResponse(response, 3600);
+            return;
+        }
+
+        RateLimitDecision decision = registerRequest(clientIp);
+
+        if (!decision.allowed()) {
+            if (!decision.persistBlock()) {
+                writeCapacityResponse(response, decision.retryAfterSeconds());
+                return;
+            }
+            blockedIpService.block(clientIp);
+            writeRateLimitResponse(response, Math.max(3600, decision.retryAfterSeconds()));
             return;
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void writeRateLimitResponse(HttpServletResponse response, long retryAfterSeconds) throws IOException {
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setHeader("Retry-After", Long.toString(retryAfterSeconds));
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("{\"message\":\"С этого IP уже отправлено 3 заявки за последний час. Попробуйте позже.\"}");
+    }
+
+    private void writeCapacityResponse(HttpServletResponse response, long retryAfterSeconds) throws IOException {
+        response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+        response.setHeader("Retry-After", Long.toString(retryAfterSeconds));
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write("{\"message\":\"Сервис временно перегружен. Попробуйте позже.\"}");
     }
 
     private synchronized RateLimitDecision registerRequest(String clientIp) {
@@ -61,7 +96,7 @@ public class ApplicationIpRateLimitFilter extends OncePerRequestFilter {
             if (requestsByIp.size() >= MAX_TRACKED_IPS) {
                 removeExpiredIpBuckets(now);
                 if (requestsByIp.size() >= MAX_TRACKED_IPS) {
-                    return new RateLimitDecision(false, 60);
+                    return new RateLimitDecision(false, 60, false);
                 }
             }
             requestTimes = new ArrayDeque<>();
@@ -72,14 +107,14 @@ public class ApplicationIpRateLimitFilter extends OncePerRequestFilter {
         if (requestTimes.size() >= MAX_REQUESTS) {
             long waitNanos = WINDOW_NANOS - (now - requestTimes.peekFirst());
             long retryAfterSeconds = Math.max(1, (waitNanos + 999_999_999L) / 1_000_000_000L);
-            return new RateLimitDecision(false, retryAfterSeconds);
+            return new RateLimitDecision(false, retryAfterSeconds, true);
         }
 
         requestTimes.addLast(now);
         if (++acceptedRequests % CLEANUP_EVERY == 0) {
             removeExpiredIpBuckets(now);
         }
-        return new RateLimitDecision(true, 0);
+        return new RateLimitDecision(true, 0, false);
     }
 
     private void removeExpiredIpBuckets(long now) {
@@ -97,6 +132,6 @@ public class ApplicationIpRateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private record RateLimitDecision(boolean allowed, long retryAfterSeconds) {
+    private record RateLimitDecision(boolean allowed, long retryAfterSeconds, boolean persistBlock) {
     }
 }
