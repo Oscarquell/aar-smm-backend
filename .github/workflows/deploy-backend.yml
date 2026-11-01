@@ -77,5 +77,5 @@ jobs:
           SERVER_HOST: ${{ secrets.DEPLOY_SERVER_HOST }}
           SERVER_USER: ${{ secrets.DEPLOY_SERVER_USER }}
         run: |
-          scp compose.yaml Caddyfile "$SERVER_USER@$SERVER_HOST:/opt/azem-smm/"
-          ssh "$SERVER_USER@$SERVER_HOST" 'cd /opt/azem-smm && docker compose pull api && docker compose up -d --remove-orphans'
+          scp compose.yaml Caddyfile "$SERVER_USER@$SERVER_HOST:/opt/azem-smm/app/"
+          ssh "$SERVER_USER@$SERVER_HOST" 'cd /opt/azem-smm/app && docker compose --env-file ../.env pull api && docker compose --env-file ../.env up -d --remove-orphans'
