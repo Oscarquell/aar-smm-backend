@@ -30,6 +30,13 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the server .env file}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:?Set APP_CORS_ALLOWED_ORIGINS in the server .env file}
       MEDIA_STORAGE_PATH: /data/uploads
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      BIRTHPINGER_CRON: "${BIRTHPINGER_CRON:-0 0 9 * * *}"
+      BIRTHPINGER_TIMEZONE: ${BIRTHPINGER_TIMEZONE:-Asia/Bishkek}
     volumes:
       - uploads:/data/uploads
     depends_on:

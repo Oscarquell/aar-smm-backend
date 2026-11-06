@@ -1,0 +1,6 @@
+server:
+  address: 127.0.0.1
+
+app:
+  birthpinger:
+    local-manual-trigger-public: true
